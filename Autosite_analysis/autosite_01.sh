@@ -6,12 +6,12 @@ do
 	name="${filename%.*}"
 	protein="${name%%_*}"
 	pocketnt="${name: -3}"
-	echo $i
-	echo $dir
-	echo $filename
-	echo $name
-	echo $protein
-	echo $pocketnt
+	#echo $i
+	#echo $dir
+	#echo $filename
+	#echo $name
+	echo -n "$protein , $pocketnt , "
+	echo
 	#python -W ignore ../../pdb-seq.py $i > ./SEQ/${name%.*}.seq
 	
 done
