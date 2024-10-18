@@ -16,5 +16,5 @@ for ln in f:
 	print(out)
 	out="curl -o "+lnargs[1]+"_v4.pdb https://alphafold.ebi.ac.uk/files/AF-"+lnargs[0]+"-F1-model_v4.pdb"
 	print(out)
-	out="curl -o "+lnargs[1]+"._v5pdb https://alphafold.ebi.ac.uk/files/AF-"+lnargs[0]+"-F1-model_v5.pdb"
+	out="curl -o "+lnargs[1]+"_v5.pdb https://alphafold.ebi.ac.uk/files/AF-"+lnargs[0]+"-F1-model_v5.pdb"
 	print(out)
