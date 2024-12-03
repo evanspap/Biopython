@@ -15,33 +15,40 @@ def parse_uniprot_xml(xml_file):
         seqid = entry.find("ns:name", namespace)
         seqid = seqid.text if seqid is not None else "Unknown"
 
+        # Get the protein sequence
+        sequence_element = entry.find("ns:sequence", namespace)
+        sequence = sequence_element.text.strip() if sequence_element is not None else ""
+
         # Extract features
         features = []
         for db_ref in entry.findall("ns:dbReference", namespace):
             if db_ref.attrib.get("type") == "PDB":
+                method = None
+                chains = None
                 for prop in db_ref.findall("ns:property", namespace):
                     if prop.attrib.get("type") == "method":
                         method = prop.attrib.get("value")
                     elif prop.attrib.get("type") == "chains":
                         chains = prop.attrib.get("value")
-                        for chain in chains.split(","):
-                            parts = chain.split("=")
-                            if len(parts) == 2:
-                                residues = parts[1]
-                                start, end = map(int, residues.split("-"))
-                                features.append({
-                                    "seqid": seqid,
-                                    "source": "UniProt",
-                                    "type": method,
-                                    "start": start,
-                                    "end": end,
-                                    "score": ".",
-                                    "strand": ".",
-                                    "phase": ".",
-                                    "attributes": f"ID={method}_{start}_{end};Evidence=PBD:{db_ref.attrib.get('id')}"
-                                })
+                if method and chains:
+                    for chain in chains.split(","):
+                        parts = chain.split("=")
+                        if len(parts) == 2:
+                            residues = parts[1]
+                            start, end = map(int, residues.split("-"))
+                            features.append({
+                                "seqid": seqid,
+                                "source": "UniProt",
+                                "type": method,
+                                "start": start,
+                                "end": end,
+                                "score": ".",
+                                "strand": ".",
+                                "phase": ".",
+                                "attributes": f"ID={method}_{start}_{end};Evidence=PBD:{db_ref.attrib.get('id')}"
+                            })
 
-        proteins.append({"seqid": seqid, "features": features})
+        proteins.append({"seqid": seqid, "features": features, "sequence": sequence})
 
     return proteins
 
@@ -53,12 +60,14 @@ def generate_gff3(proteins, output_dir):
     for protein in proteins:
         seqid = protein["seqid"]
         features = protein["features"]
+        sequence = protein["sequence"]
 
         output_path = os.path.join(output_dir, f"{seqid}.gff")
         with open(output_path, "w") as gff_file:
             # Write GFF3 header
             gff_file.write("##gff-version 3\n")
-            gff_file.write(f"##sequence-region {seqid} 1 {max([f['end'] for f in features]) if features else 1}\n")
+            if features:
+                gff_file.write(f"##sequence-region {seqid} 1 {max([f['end'] for f in features])}\n")
 
             # Write features
             for feature in features:
@@ -67,6 +76,14 @@ def generate_gff3(proteins, output_dir):
                     f"{feature['start']}\t{feature['end']}\t{feature['score']}\t"
                     f"{feature['strand']}\t{feature['phase']}\t{feature['attributes']}\n"
                 )
+
+            # Append sequence in FASTA format
+            if sequence:
+                gff_file.write("##FASTA\n")
+                gff_file.write(f">{seqid}\n")
+                # Split sequence into 60-character lines
+                for i in range(0, len(sequence), 60):
+                    gff_file.write(sequence[i:i + 60] + "\n")
 
 # Main execution
 if __name__ == "__main__":
