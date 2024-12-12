@@ -1,5 +1,6 @@
 import sys
 from Bio import SeqIO
+from Bio.Seq import Seq
 
 def replace_sequence_in_genebank(genebank_file, fasta_file, output_file):
     # Read the FASTA sequence
@@ -13,7 +14,7 @@ def replace_sequence_in_genebank(genebank_file, fasta_file, output_file):
         genbank_record = SeqIO.read(genebank_handle, "genbank")
     
     # Replace the sequence in the GeneBank record
-    genbank_record.seq = fasta_seq
+    genbank_record.seq = Seq(fasta_seq)  # Ensure sequence is a Seq object
     
     # Write the updated GeneBank file
     with open(output_file, "w") as output_handle:
