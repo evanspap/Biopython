@@ -22,8 +22,8 @@ find "$folder1" -type f -name '*_pocket.gbk' | while read -r gbk_file; do
     # Define corresponding FASTA file in folder2
     fasta_file="$folder2/${basename}.fasta"
 
-    # Define output file in folder2
-    output_file="$folder2/${basename}_pocket_corr.gbk"
+    # Define output file path in the same directory as the GeneBank file
+    output_file="$(dirname "$gbk_file")/${basename}_pocket_corr.gbk"
 
     # Check if the FASTA file exists
     if [ ! -f "$fasta_file" ]; then
