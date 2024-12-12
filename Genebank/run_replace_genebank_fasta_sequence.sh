@@ -15,15 +15,15 @@ folder1=$2
 folder2=$3
 
 # Iterate through all subdirectories in folder1 looking for *_pocket.gbk files
-find "$folder1" -type f -name '*_pocket.gbk' | while read -r gbk_file; do
+find "$folder1" -type f -name '*_pockets.gbk' | while read -r gbk_file; do
     # Extract basename without directory and suffix
-    basename=$(basename "$gbk_file" "_pocket.gbk")
+    basename=$(basename "$gbk_file" "_pockets.gbk")
 
     # Define corresponding FASTA file in folder2
     fasta_file="$folder2/${basename}.fasta"
 
     # Define output file path in the same directory as the GeneBank file
-    output_file="$(dirname "$gbk_file")/${basename}_pocket_corr.gbk"
+    output_file="$(dirname "$gbk_file")/${basename}_pockets_corr.gbk"
 
     # Check if the FASTA file exists
     if [ ! -f "$fasta_file" ]; then
