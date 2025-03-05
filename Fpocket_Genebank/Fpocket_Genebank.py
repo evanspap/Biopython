@@ -65,9 +65,9 @@ def create_genbank(folder_name, output_folder):
             
             if residues:
                 pocket_number = re.search(r'pocket(\d+)_atm.pdb', pdb_file).group(1)
-                feature_key = f"Pocket{pocket_number.zfill(2)}"
+                feature_key = f"Fpock_{pocket_number.zfill(2)}"
                 residue_positions = [res[2] for res in residues]
-                location = CompoundLocation([FeatureLocation(pos, pos + 1) for pos in residue_positions])
+                location = CompoundLocation([FeatureLocation(pos-1, pos) for pos in residue_positions])
                 
                 cleaned_headers = {k: v for k, v in header_info.items() if k and not k.isspace()}
                 
