@@ -14,12 +14,15 @@ with open(output_html, "w") as html_file:
     html_file.write("    <meta name='viewport' content='width=device-width, initial-scale=1.0'>\n")
     html_file.write("    <title>PDB Image Gallery</title>\n")
     html_file.write("    <style>\n")
-    html_file.write("        body { font-family: Arial, sans-serif; text-align: center; }\n")
+    html_file.write("        body { font-family: Arial, sans-serif; text-align: center; margin: 0; padding: 0; }\n")
+    html_file.write("        .header { position: fixed; top: 0; width: 100%; background: white; padding: 10px 0; box-shadow: 0px 4px 2px -2px gray; z-index: 1000; }\n")
+    html_file.write("        .content { margin-top: 60px; }\n")
     html_file.write("        table { width: 100%; border-collapse: collapse; }\n")
     html_file.write("        td { padding: 10px; border: 1px solid #ccc; text-align: center; }\n")
     html_file.write("        img { width: 400px; height: auto; display: block; margin: auto; }\n")
     html_file.write("    </style>\n</head>\n<body>\n")
-    html_file.write("    <h1>PDB Image Gallery</h1>\n")
+    html_file.write("    <div class='header'><h1>PDB Image Gallery</h1></div>\n")
+    html_file.write("    <div class='content'>\n")
     html_file.write("    <table>\n")
 
     for index, pdb_file in enumerate(pdb_files):
@@ -31,6 +34,7 @@ with open(output_html, "w") as html_file:
             html_file.write("        </tr>\n")
     
     html_file.write("    </table>\n")
+    html_file.write("    </div>\n")
     html_file.write("</body>\n</html>")
 
 print(f"Gallery generated: {output_html}")
