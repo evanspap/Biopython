@@ -1,8 +1,37 @@
-import os
+#!/usr/bin/env python3
+"""
+Generate_Pdb_Image_List.py
 
-# Directory containing the images
+This script generates an HTML file displaying a gallery of PNG images from a specified directory.
+
+Usage:
+    python Generate_Pdb_Image_List.py [image_dir] [output_html]
+
+Arguments:
+    image_dir   - Directory containing PNG images (default: "images")
+    output_html - Output HTML file (default: "pdb_gallery.html")
+
+Example:
+    python Generate_Pdb_Image_List.py pdb_images gallery.html
+"""
+
+import os
+import sys
+
+# Default values
 image_dir = "images"
 output_html = "pdb_gallery.html"
+
+# Get arguments if provided
+if len(sys.argv) > 1:
+    image_dir = sys.argv[1]
+if len(sys.argv) > 2:
+    output_html = sys.argv[2]
+
+# Check if the directory exists
+if not os.path.isdir(image_dir):
+    print(f"Error: Directory '{image_dir}' does not exist.")
+    sys.exit(1)
 
 # Get all PNG files in the directory
 pdb_files = sorted([f for f in os.listdir(image_dir) if f.endswith(".png")])
