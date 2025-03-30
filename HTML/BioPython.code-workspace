@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+		{
+			"path": "../../GitHub/scripts"
+		}
+	],
+	"settings": {
+		"liveServer.settings.multiRootWorkspaceName": "BioPython"
+	}
+}
