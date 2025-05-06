@@ -20,18 +20,31 @@ from rdkit import Chem
 
 def sdf_to_smiles(input_file, output_file, dry_run=False):
     suppl = Chem.SDMolSupplier(input_file)
+    smis = []
+    names = []
+
+    for mol in suppl:
+        if mol is None:
+            continue  # Skip invalid molecules
+
+        # Clear atom map numbers
+        for atom in mol.GetAtoms():
+            atom.SetAtomMapNum(0)
+
+        smi = Chem.MolToSmiles(mol, canonical=True)
+        mol_name = mol.GetProp('_Name') if mol.HasProp('_Name') else ''
+        smis.append(smi)
+        names.append(mol_name)
 
     if dry_run:
         print(f"[Dry Run] Would convert '{input_file}' to canonical SMILES in '{output_file}'")
+        for smi, name in zip(smis, names):
+            print(f"{smi} {name}")
         return
 
     with open(output_file, 'w') as f:
-        for mol in suppl:
-            if mol is None:
-                continue  # Skip invalid molecules
-            smi = Chem.MolToSmiles(mol, canonical=True)
-            mol_name = mol.GetProp('_Name') if mol.HasProp('_Name') else ''
-            f.write(f"{smi} {mol_name}\n")
+        for smi, name in zip(smis, names):
+            f.write(f"{smi} {name}\n")
 
     print(f"Conversion complete: '{output_file}' generated.")
 
