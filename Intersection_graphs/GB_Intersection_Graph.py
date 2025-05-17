@@ -1,69 +1,119 @@
-import pandas as pd
 import argparse
 import os
+import csv
 
-# ==============================================================
+# =============================================================
 # Script: Intersection Graph Table Generator
-# Description: This script processes a GenBank (.gb) file, extracts
-#              residue positions from all annotations, and generates
-#              an intersection graph table showing shared residues.
+# Description:
+#   Processes a GenBank (.gb) file, extracts residues from multi-line
+#   join() annotations, computes intersection counts, and dumps
+#   metadata qualifiers as a single comma-separated field at end of each row.
+# Version: 1.0.10
+# Date: 2025-05-13
 # Usage: python GB_Intersection_Graph.py <input_file> <output_file>
-# Example: python GB_Intersection_Graph.py ADSS2.gb results/Intersection_Graph_Table.csv
-# ==============================================================
+# Example: python GB_Intersection_Graph.py TLE3.gb results/Intersection_Graph_Table.csv
+# =============================================================
 
-# Function to extract residue positions from a join() field
-def extract_positions(line):
-    positions = line.split("join(")[-1].replace(")", "").split(",")
-    return set(map(int, filter(str.isdigit, positions)))
+def extract_positions(join_text):
+    # Extract integers from join(...) possibly spanning multiple lines
+    inner = join_text[join_text.find('join(') + 5:]
+    if ')' in inner:
+        inner = inner[:inner.rfind(')')]
+    parts = inner.replace('(', '').replace(')', '').split(',')
+    positions = set()
+    for part in parts:
+        nums = ''.join(ch for ch in part if ch.isdigit())
+        if nums:
+            positions.add(int(nums))
+    return positions
 
-# Parse command-line arguments
-parser = argparse.ArgumentParser(description="Generate an intersection graph table for all annotation residues.")
-parser.add_argument("input_file", help="Path to the GenBank input file")
-parser.add_argument("output_file", help="Full path to the output CSV file (including filename)")
-args = parser.parse_args()
 
-genbank_file = args.input_file
-output_file = args.output_file
-
-
-pockets = {}
-print("Processing file:", genbank_file)
-
-with open(genbank_file, "r") as file:
-    for line in file:
-        line = line.strip()
-        if "join(" in line:
-            pocket_name = line.split()[0]  # First word is the pocket name
-            positions = extract_positions(line)
-            pockets[pocket_name] = positions
-
-# Create an intersection graph table with total residue counts
-pocket_names = list(pockets.keys())
-total_residues = {p: len(pockets[p]) for p in pocket_names}
-
-intersection_matrix = {p1: {p2: 0 for p2 in pocket_names} for p1 in pocket_names}
-
-# Compute intersection counts
-for p1 in pocket_names:
-    for p2 in pocket_names:
-        if p1 == p2:
-            intersection_matrix[p1][p2] = total_residues[p1]  # Self-comparison should be total residues
+def extract_metadata(lines, idx):
+    # After a join(...) block, capture lines starting with '/'
+    qualifiers = []
+    j = idx
+    while j + 1 < len(lines):
+        nxt = lines[j+1].strip()
+        if nxt.startswith('/'):
+            # strip leading slash, parse key=value without quotes
+            key_val = nxt.lstrip('/').split('=', 1)
+            key = key_val[0]
+            val = key_val[1].strip().strip('"') if len(key_val) > 1 else ''
+            qualifiers.append(f"{key}={val}")
+            j += 1
         else:
-            common_residues = pockets[p1] & pockets[p2]
-            intersection_matrix[p1][p2] = len(common_residues)
+            break
+    return qualifiers, j
 
-# Convert matrix into a DataFrame and add total residue counts
-intersection_df = pd.DataFrame(intersection_matrix).T
-intersection_df.insert(0, "Total Residues", [total_residues[p] for p in pocket_names])
 
-# Add the "Total Residues" row at the top
-total_residue_row = ["-"] + [total_residues[p] for p in pocket_names]
-intersection_df.loc["Total Residues"] = total_residue_row
+def main():
+    parser = argparse.ArgumentParser(description="Generate intersection graph table with metadata dumped per pocket.")
+    parser.add_argument("input_file", help="Path to GenBank input file (.gb)")
+    parser.add_argument("output_file", help="Path to CSV output file")
+    args = parser.parse_args()
 
-# Reorder to move "Total Residues" to the first row
-intersection_df = intersection_df.iloc[[-1] + list(range(len(intersection_df) - 1))]
+    # Ensure output directory exists
+    out_dir = os.path.dirname(args.output_file)
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
 
-# Save the output to the specified file
-intersection_df.to_csv(output_file)
+    # Read file
+    with open(args.input_file) as fh:
+        lines = fh.readlines()
 
-print(f"Intersection graph table saved to {output_file}")
+    # Parse join() and metadata
+    pockets = {}       # pocket_name -> set of residues
+    pocket_meta = {}   # pocket_name -> list of key=value strings
+
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if 'join(' in line:
+            pocket = line.strip().split()[0]
+            join_txt = line.strip()
+            # accumulate multi-line join
+            open_p = join_txt.count('(')
+            close_p = join_txt.count(')')
+            j = i
+            while open_p > close_p and j + 1 < len(lines):
+                j += 1
+                nxt = lines[j].strip()
+                join_txt += nxt
+                open_p += nxt.count('(')
+                close_p += nxt.count(')')
+            # extract residues
+            pockets[pocket] = extract_positions(join_txt)
+            # extract metadata qualifiers
+            qualifiers, end_idx = extract_metadata(lines, j)
+            pocket_meta[pocket] = qualifiers
+            i = end_idx + 1
+        else:
+            i += 1
+
+    # Build intersection counts
+    pocket_names = list(pockets)
+    total = {p: len(pockets[p]) for p in pocket_names}
+    # prepare matrix p1->p2 count
+    matrix = {p1: {p2: (total[p1] if p1==p2 else len(pockets[p1] & pockets[p2]))
+                   for p2 in pocket_names}
+              for p1 in pocket_names}
+
+        # Write CSV: header + rows using raw comma-joined lines
+    header = ['PocketName', 'Total Residues'] + pocket_names + ['Metadata']
+    with open(args.output_file, 'w') as out_file:
+        # Write header line
+        out_file.write(','.join(header) + '\n')
+        for p1 in pocket_names:
+            row = [p1, str(total[p1])]
+            row.extend(str(matrix[p1][p2]) for p2 in pocket_names)
+            # metadata qualifiers as comma-separated
+            meta_str = ', '.join(pocket_meta.get(p1, []))
+            row.append(meta_str)
+            # write each data row
+            out_file.write(','.join(row) + '\n')
+
+        # Finish
+    print(f"Intersection graph table saved to {args.output_file}")
+
+if __name__ == '__main__':
+    main()
