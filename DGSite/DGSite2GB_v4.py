@@ -11,99 +11,84 @@ from Bio.SeqFeature import SeqFeature, FeatureLocation, CompoundLocation
 from Bio.PDB import PDBParser
 
 """
-Script: DGSite2GB_v2.py
-Description: This script extracts residue features from PDB files and matches them with corresponding pocket data from a *_desc.txt file.
-             The extracted information is stored in a GenBank file for further analysis.
-             It utilizes the output from the Differential of Gaussians (DoG) pocket identification method.
-Usage: python script.py <input_folder> <output_file>
-Example: python script.py ./input data_output.gb
+Script: DGSite2GB_v4.py
+Version: 2025-05-20
+Last modified: 2025-05-20
+Description: This script extracts residue features from only the `_res_P_*` pocket and subpocket PDB files,
+             matches them with corresponding descriptor data from a `*_desc.txt` file (if found),
+             and writes annotated features into a GenBank file. Features are named `DG_<pocket_number>`
+             (e.g., DG_16 or DG_16_2).
 """
 
-# Timestamp of script creation
-script_written_time = "2025-02-10 14:30:00"  # Update this manually when editing
-print(f"Script last modified on: {script_written_time}")
-
-def print_usage():
-    print("\nThis script processes PDB files to extract residue features and associates them with pocket properties from a *_desc.txt file.")
-    print("The output is stored in a GenBank format file. It utilizes the output from the Differential of Gaussians (DoG) pocket identification method.")
-    print("\nUsage: python script.py <input_folder> <output_file>")
-    print("Example: python script.py ./input data_output.gb\n")
+# Parse input arguments
+pdb_dir = sys.argv[1] if len(sys.argv) > 1 else None
+output_file = sys.argv[2] if len(sys.argv) > 2 else None
+if not pdb_dir or not output_file:
+    print("Usage: python DGSite2GB_v4.py <pdb_dir> <output_genbank_file>")
+    print("Example: python DGSite2GB_v4.py ./Human_2e1r/ Human_2e1r.gb")
     sys.exit(1)
 
-# Check for command-line arguments
-if len(sys.argv) != 3:
-    print("\n[ERROR] Incorrect number of arguments provided.")
-    print_usage()
+# Auto-detect descriptor file based on output filename
+record_name = os.path.splitext(os.path.basename(output_file))[0]
+possible_desc = [f"{record_name}_desc.txt", os.path.join(pdb_dir, f"{record_name}_desc.txt")]
+desc_data = None
+for desc_path in possible_desc:
+    if os.path.exists(desc_path):
+        desc_data = pd.read_csv(desc_path, sep="\t")
+        break
+if desc_data is None:
+    print(f"Descriptor file not found among: {possible_desc}, proceeding without descriptors.")
 
-input_folder = sys.argv[1]
-output_file = sys.argv[2]
+# Initialize GenBank record
+overall_sequence = ''  # Construct or load as needed
+record = SeqRecord(Seq(overall_sequence), id=record_name, description='')
+record.annotations['molecule_type'] = 'protein'
+record.annotations['date'] = datetime.datetime.now().strftime('%Y-%m-%d')
 
-# Function to extract residue numbers from PDB
-def extract_residue_numbers_from_pdb(pdb_file):
+# Process only _res_P_*.pdb pocket and subpocket files
+pattern = os.path.join(pdb_dir, '*_res_P_*.pdb')
+for pdb_file in sorted(glob.glob(pattern)):
+    # Extract pocket/subpocket number for feature naming
+    match = re.search(r'_res_P_(\d+(?:_\d+)*)\.pdb$', pdb_file)
+    if not match:
+        continue
+    pocket_number = match.group(1)
+    feature_name = f"DG_{pocket_number}"
+
+    # Print annotated file for debugging
+    print(f"Annotating {os.path.basename(pdb_file)} as {feature_name}")
+
+    # Extract residue numbers from PDB
     parser = PDBParser(QUIET=True)
-    structure = parser.get_structure("protein", pdb_file)
-    
-    residue_numbers = []
-    for model in structure:
-        for chain in model:
-            for residue in chain:
-                if residue.id[0] == " ":  # Ignore heteroatoms
-                    residue_numbers.append(residue.id[1])
-    
-    return sorted(set(residue_numbers))  # Return unique sorted residue numbers
+    structure = parser.get_structure('protein', pdb_file)
+    residue_numbers = [res.id[1]
+                       for model in structure
+                       for chain in model
+                       for res in chain
+                       if res.id[0] == ' ']
 
-# Find the *_desc.txt file
-desc_file = glob.glob(os.path.join(input_folder, "*_desc.txt"))
-if not desc_file:
-    print("Warning: No *_desc.txt file found. Proceeding without additional pocket data.")
-    desc_data = None
-else:
-    desc_file = desc_file[0]
-    desc_data = pd.read_csv(desc_file, sep="\t")
+    # Build location
+    parts = [FeatureLocation(pos-1, pos) for pos in residue_numbers]
+    if not parts:
+        print(f"Warning: no residues found in {pdb_file}, skipping")
+        continue
+    location = parts[0] if len(parts) == 1 else CompoundLocation(parts)
 
-# Find all matching PDB files
-pdb_files = glob.glob(os.path.join(input_folder, "*_res_P_*.pdb"))
-
-# Create a single GenBank record
-record = SeqRecord(
-    Seq(""),  # No sequence, only features
-    id="Generated_Protein",
-    name="Generated_Protein",
-    description="GenBank file with extracted residue features from multiple PDB files",
-    annotations={"molecule_type": "protein", "script_written_time": script_written_time}  # Required for GenBank format
-)
-
-# Add each PDB file's residue numbers as a separate feature
-for pdb_file in pdb_files:
-    residue_numbers = extract_residue_numbers_from_pdb(pdb_file)
-    if not residue_numbers:
-        continue  # Skip files with no residues
-    
-    # Extract pocket number for feature naming
-    match = re.search(r'_res_P_(\d+)\.pdb$', pdb_file)
-    pocket_number = match.group(1) if match else "XX"
-    feature_name = f"DGsite{pocket_number.zfill(2)}"
-    
-    # Define feature location using CompoundLocation
-    location = CompoundLocation([FeatureLocation(pos-1, pos) for pos in residue_numbers])
-    
-    # Retrieve additional data from *_desc.txt if available
-    qualifiers = {"note": feature_name, "source": os.path.basename(pdb_file)}
+    # Retrieve descriptor qualifiers if available
+    qualifiers = {'note': feature_name, 'source': os.path.basename(pdb_file)}
     if desc_data is not None:
-        pocket_row = desc_data[desc_data['name'] == f"P_{pocket_number}"]
+        key = f"P_{pocket_number}"
+        pocket_row = desc_data[desc_data['name'] == key]
         if not pocket_row.empty:
             for col in pocket_row.columns:
                 qualifiers[col] = str(pocket_row.iloc[0][col])
-    
-    feature = SeqFeature(
-        location,
-        type=feature_name,
-        qualifiers=qualifiers
-    )
+
+    # Create and append feature
+    feature = SeqFeature(location, type=feature_name, qualifiers=qualifiers)
     record.features.append(feature)
 
-# Write to GenBank file
-with open(output_file, "w") as output_handle:
-    SeqIO.write(record, output_handle, "genbank")
+# Write out GenBank file
+with open(output_file, 'w') as output_handle:
+    SeqIO.write(record, output_handle, 'genbank')
 
 print(f"GenBank file '{output_file}' generated successfully with {len(record.features)} features!")
