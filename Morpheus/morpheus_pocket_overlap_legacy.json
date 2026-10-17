@@ -1,0 +1,26 @@
+{
+  "valueToColorScheme": {
+    "null": {
+      "fractions": [
+        0,
+        0.5,
+        0.5,
+        0.75,
+        1
+      ],
+      "colors": [
+        "black",
+        "#000000",
+        "#0000ff",
+        "#ffffff",
+        "#ff0000"
+      ],
+      "min": 0,
+      "max": 100,
+      "missingColor": "#c0c0c0",
+      "scalingMode": 1,
+      "stepped": false,
+      "transformValues": 0
+    }
+  }
+}
