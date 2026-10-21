@@ -259,7 +259,7 @@ def render(input_path, output_prefix, mode, args, title=None):
         vmax = draw_heatmap(fig, ax, rows, cols, data, mode, args,
                             title or args.title or input_path.stem)
         fig.tight_layout()
-        raster_dpi = save_figures(fig, files, args)
+        used_raster_dpi = save_figures(fig, files, args)
     finally:
         plt.close(fig)
         fig = ax = None
@@ -274,7 +274,7 @@ def render(input_path, output_prefix, mode, args, title=None):
         "data_order": "exact CSV order", "pdf_svg_cells": "vector",
         "percentage_label_rounding": "ceil, after 10-decimal floating-point stabilization",
         "color_values": "unrounded CSV values",
-        "raster_dpi_used": raster_dpi, "dpi_requested": args.dpi,
+        "raster_dpi_used": used_raster_dpi, "dpi_requested": args.dpi,
         "outputs": [str(path) for path in files], "status": "complete",
     }
     qc_path.write_text(json.dumps(qc, indent=2) + "\n", encoding="utf-8")
@@ -363,8 +363,7 @@ def render_composite(protein, folder, mode, output_dir, args):
         label = "percentage overlaps" if mode == "percentage" else "shared-residue counts"
         fig.suptitle(f"{protein} structural model and pairwise pocket comparisons — {label}",
                      fontsize=18, fontweight="bold")
-        for path in files:
-            fig.savefig(path, format=path.suffix[1:], dpi=args.dpi, bbox_inches="tight")
+        used_raster_dpi = save_figures(fig, files, args)
     finally:
         plt.close(fig)
         fig = ax = axes = None
@@ -381,7 +380,7 @@ def render_composite(protein, folder, mode, output_dir, args):
           "color_values": "unrounded CSV values",
           "color_config": str((args.color_config or Path(__file__).with_name("morpheus_pocket_overlap_legacy.json")).resolve()),
         "color_config_sha256": hashlib.sha256((args.color_config or Path(__file__).with_name("morpheus_pocket_overlap_legacy.json")).read_bytes()).hexdigest(),
-          "raster_dpi_used": raster_dpi, "dpi_requested": args.dpi,
+          "raster_dpi_used": used_raster_dpi, "dpi_requested": args.dpi,
           "outputs": [str(path) for path in files]}
     qc_path.write_text(json.dumps(qc, indent=2) + "\n", encoding="utf-8")
     print(f"Composite {protein} ({mode}): " + ", ".join(str(p) for p in files))
